@@ -82,6 +82,8 @@ function beginDrawingPhase(roomId) {
   const drawer = room.currentDrawer;
   room.startTime = Date.now();
   let timeLeft = 60;
+  io.to(roomId).emit("clearCanvas");
+
 
   io.to(roomId).emit("roundStarted", {
     drawer,
@@ -205,9 +207,10 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("draw", ({ roomId, x, y, color, size }) => {
-    socket.to(roomId).emit("draw", { x, y, color, size });
-  });
+ socket.on("draw", ({ roomId, x0, y0, x1, y1, color, brushSize }) => {
+  socket.to(roomId).emit("draw", { x0, y0, x1, y1, color, brushSize });
+});
+
 
   socket.on("disconnect", () => {
     for (const roomId in rooms) {
@@ -236,6 +239,10 @@ io.on("connection", (socket) => {
 });
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+
+
+
 
 
 
