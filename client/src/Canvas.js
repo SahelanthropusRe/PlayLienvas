@@ -1,5 +1,5 @@
 // src/Canvas.js
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 
 const Canvas = ({ socket, roomId, isDrawer }) => {
   const canvasRef = useRef(null);
@@ -10,29 +10,13 @@ const Canvas = ({ socket, roomId, isDrawer }) => {
 
   const neonColors = ["#00ffff", "#ff00ff", "#39ff14", "#ff073a", "#faff00"];
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    ctx.lineCap = "round";
-    ctx.lineWidth = lineWidth;
-
-    const handleDrawFromServer = ({ x0, y0, x1, y1, color, width }) => {
-      drawLine(x0, y0, x1, y1, false, color, width);
-    };
-
-    socket.on("draw", handleDrawFromServer);
-
-    return () => {
-      socket.off("draw", handleDrawFromServer);
-    };
-  }, [socket]);
-
-  const drawLine = (x0, y0, x1, y1, emit = false, drawColor = color, width = lineWidth) => {
+  const drawLine = useCallback((x0, y0, x1, y1, emit = false, drawColor = color, width = lineWidth) => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
 
     ctx.strokeStyle = isErasing ? "black" : drawColor;
     ctx.lineWidth = width;
+    ctx.lineCap = "round";
 
     ctx.beginPath();
     ctx.moveTo(x0, y0);
@@ -41,6 +25,7 @@ const Canvas = ({ socket, roomId, isDrawer }) => {
     ctx.closePath();
 
     if (!emit) return;
+
     socket.emit("draw", {
       roomId,
       x0,
@@ -50,7 +35,27 @@ const Canvas = ({ socket, roomId, isDrawer }) => {
       color: isErasing ? "black" : drawColor,
       width,
     });
-  };
+  }, [socket, roomId, color, isErasing, lineWidth]);
+
+  useEffect(() => {
+    const handleDrawFromServer = ({ x0, y0, x1, y1, color, width }) => {
+      drawLine(x0, y0, x1, y1, false, color, width);
+    };
+
+    const handleClearCanvas = () => {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+
+    socket.on("draw", handleDrawFromServer);
+    socket.on("clearCanvas", handleClearCanvas);
+
+    return () => {
+      socket.off("draw", handleDrawFromServer);
+      socket.off("clearCanvas", handleClearCanvas);
+    };
+  }, [socket, drawLine]);
 
   const getMousePos = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();
@@ -86,9 +91,14 @@ const Canvas = ({ socket, roomId, isDrawer }) => {
       {/* Toolbar */}
       <div className="toolbar" style={{ marginBottom: 10, display: "flex", gap: 10 }}>
         <label>
-          <input type="checkbox" checked={isErasing} onChange={() => setIsErasing(!isErasing)} />
+          <input
+            type="checkbox"
+            checked={isErasing}
+            onChange={() => setIsErasing(!isErasing)}
+          />
           Eraser
         </label>
+
         <label>
           Line Width:
           <input
@@ -99,6 +109,7 @@ const Canvas = ({ socket, roomId, isDrawer }) => {
             onChange={(e) => setLineWidth(Number(e.target.value))}
           />
         </label>
+
         <label>Color:</label>
         {neonColors.map((c, i) => (
           <button
@@ -113,10 +124,11 @@ const Canvas = ({ socket, roomId, isDrawer }) => {
             }}
             onClick={() => {
               setColor(c);
-              setIsErasing(false); // Auto-disable eraser when picking color
+              setIsErasing(false);
             }}
           />
         ))}
+
         <input
           type="color"
           value={color}
