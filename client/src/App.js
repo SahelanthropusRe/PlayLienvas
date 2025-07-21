@@ -4,7 +4,7 @@ import io from "socket.io-client";
 import Canvas from "./Canvas";
 import "./App.css";
 
-const socket = io("http://localhost:3001");
+const socket = io("https://playlienvas.onrender.com");
 
 function App() {
   const [roomId, setRoomId] = useState("");
